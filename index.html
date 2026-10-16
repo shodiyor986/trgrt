@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LudoGames - Tizim</title>
-    <!-- SheetJS kutubxonasi Excel fayllar bilan ishlash uchun -->
+    <!-- SheetJS kutubxonasi Excel faylni o'qish uchun -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
@@ -17,7 +17,7 @@
         .hidden { display: none; }
         .success { color: green; font-weight: bold; }
         .error { color: red; font-size: 14px; }
-        .info { color: #555; font-size: 12px; margin-top: 10px; }
+        .info { color: #555; font-size: 11px; margin-top: 15px; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -45,56 +45,60 @@
     <!-- 3. Asosiy ilova sahifasi -->
     <div class="card hidden" id="appCard">
         <h2 class="success">Xush kelibsiz, <span id="welcomeUser"></span>!</h2>
-        <p>Siz LudoGames tizimiga muvaffaqiyatli kirdingiz.</p>
-        <button onclick="downloadUpdatedExcel()" style="background: #17a2b8; margin-bottom: 10px;">Yangi Excel faylni yuklab olish</button>
-        <button onclick="logout()" style="background: #dc3545;">Chiqish</button>
-        <p class="info">Eslatma: Yangi ro'yxatdan o'tganlar bazaga qo'shiladi va istalgan vaqt "Yangi Excel faylni yuklab olish" orqali faylni yangilab Dropbox'ga tashlashingiz mumkin.</p>
+        <p>Siz tizimga muvaffaqiyatli kirdingiz.</p>
+        <button onclick="logout()" style="background: #dc3545; margin-top: 20px;">Chiqish</button>
     </div>
 
     <script>
-        // Dropbox to'g'ridan-to'g'ri yuklab olish havolasi (?dl=1)
+        // Dropbox to'g'ridan-to'g'ri yuklab olish havolasi
         const dropboxUrl = "https://www.dropbox.com/scl/fi/mcud7j7jp64nhkhnr3l5e/LudoGames.xlsx?rlkey=3ne8tu46oyiv95p54wvb1bcoa&st=kya0tige&dl=1";
 
         let allUsers = [];
-        let workbookGlobal = null;
 
-        // Sahifa ochilganda Dropbox'dagi Excel faylni yuklab o'qib qo'yish
-        async function loadUsersFromExcel() {
+        // Sahifa yuklanganda Dropbox'dagi faylni va brauzer xotirasini birlashtirish
+        async function initDatabase() {
             try {
                 let response = await fetch(dropboxUrl);
                 let data = await response.arrayBuffer();
-                workbookGlobal = XLSX.read(data, {type: 'array'});
-                let firstSheetName = workbookGlobal.SheetNames[0];
-                let worksheet = workbookGlobal.Sheets[firstSheetName];
+                let workbook = XLSX.read(data, {type: 'array'});
+                let sheet = workbook.Sheets[workbook.SheetNames[0]];
+                let dropboxRows = XLSX.utils.sheet_to_json(sheet);
                 
-                // Excel'dagi qatorlarni olish
-                allUsers = XLSX.utils.sheet_to_json(worksheet);
-                
-                // Agar brauzer xotirasida (localStorage) yangi qo'shilganlar bo'lsa, ularni ham qo'shib qo'yamiz
-                let localUsers = JSON.parse(localStorage.getItem("ludo_extra_users") || "[]");
-                allUsers = allUsers.concat(localUsers);
-
-            } catch (error) {
-                console.error("Excel faylni o'qishda xatolik:", error);
-                // Agar tarmoq xatosi bo'lsa localStorage'dagilarni ishlatamiz
-                allUsers = JSON.parse(localStorage.getItem("ludo_extra_users") || "[]");
+                // Dropbox'dagi userlarni olamiz
+                allUsers = dropboxRows;
+            } catch (e) {
+                console.log("Dropbox faylini o'qib bo'lmadi, lokal xotiraga o'tilmoqda.");
+                allUsers = [];
             }
+
+            // Brauzer xotirasida (localStorage) saqlangan ro'yxatdan o'tganlarni qo'shamiz
+            let localUsers = JSON.parse(localStorage.getItem("ludo_registered_users") || "[]");
+            
+            // Ikkalasini birlashtiramiz (takrorlanishni oldini olib)
+            localUsers.forEach(locUser => {
+                if (!allUsers.some(u => u.username === locUser.username)) {
+                    allUsers.push(locUser);
+                }
+            });
         }
 
-        loadUsersFromExcel();
+        // Dastur ishga tushishi bilan bazani yuklaymiz
+        initDatabase();
 
         function showRegister() {
             document.getElementById("loginCard").classList.add("hidden");
             document.getElementById("registerCard").classList.remove("hidden");
+            document.getElementById("regError").innerText = "";
         }
 
         function showLogin() {
             document.getElementById("registerCard").classList.add("hidden");
             document.getElementById("loginCard").classList.remove("hidden");
+            document.getElementById("loginError").innerText = "";
         }
 
-        // Ro'yxatdan o'tish
-        async function registerUser() {
+        // Ro'yxatdan o'tish funksiyasi
+        function registerUser() {
             let u = document.getElementById("regUser").value.trim();
             let p = document.getElementById("regPass").value.trim();
             let err = document.getElementById("regError");
@@ -104,31 +108,31 @@
                 return;
             }
 
-            // Bazadan qidirish
+            // Oldindan bormi tekshiramiz
             let exists = allUsers.find(user => user.username === u);
             if (exists) {
                 err.innerText = "Bu login allaqachon band qilingan!";
                 return;
             }
 
-            // Yangi foydalanuvchini qo'shish
+            // Yangi user yaratish
             let newUser = { username: u, password: p };
             allUsers.push(newUser);
 
-            // LocalStorage'ga saqlab qo'yish (sahifa yangilanganda o'chib ketmasligi uchun)
-            let localUsers = JSON.parse(localStorage.getItem("ludo_extra_users") || "[]");
+            // Brauzerning localStorage xotirasiga saqlaymiz (sahifa yangilanganda o'chib ketmaydi)
+            let localUsers = JSON.parse(localStorage.getItem("ludo_registered_users") || "[]");
             localUsers.push(newUser);
-            localStorage.setItem("ludo_extra_users", JSON.stringify(localUsers));
+            localStorage.setItem("ludo_registered_users", JSON.stringify(localUsers));
 
-            alert("Muvaffaqiyatli ro'yxatdan o'tdingiz!");
+            alert("Muvaffaqiyatli ro'yxatdan o'tdingiz! Endi kirishingiz mumkin.");
             showLogin();
+            
             document.getElementById("regUser").value = "";
             document.getElementById("regPass").value = "";
-            err.innerText = "";
         }
 
-        // Tizimga kirish
-        async function loginUser() {
+        // Kirish funksiyasi
+        function loginUser() {
             let u = document.getElementById("loginUser").value.trim();
             let p = document.getElementById("loginPass").value.trim();
             let err = document.getElementById("loginError");
@@ -138,12 +142,10 @@
                 return;
             }
 
-            err.innerText = "Tekshirilmoqda...";
+            // Bazadan qidirish
+            let found = allUsers.find(user => user.username === u && String(user.password) === String(p));
 
-            // Har safar kirganda yangilangan ro'yxatni tekshiramiz
-            let userFound = allUsers.find(user => user.username === u && String(user.password) === String(p));
-
-            if (userFound) {
+            if (found) {
                 document.getElementById("loginCard").classList.add("hidden");
                 document.getElementById("appCard").classList.remove("hidden");
                 document.getElementById("welcomeUser").innerText = u;
@@ -152,22 +154,7 @@
             }
         }
 
-        // Yangilangan Excel faylni kompyuterga yuklab olish (Dropbox'ga tashlash uchun)
-        function downloadUpdatedExcel() {
-            if (!workbookGlobal) {
-                alert("Asosiy Excel fayl topilmadi!");
-                return;
-            }
-            let firstSheetName = workbookGlobal.SheetNames[0];
-            
-            // Yangi foydalanuvchilarni qo'shib yangi worksheet yasash
-            let newWorksheet = XLSX.utils.json_to_sheet(allUsers);
-            workbookGlobal.Sheets[firstSheetName] = newWorksheet;
-
-            // Faylni yuklab yuborish
-            XLSX.writeFile(workbookGlobal, "LudoGames_Updated.xlsx");
-        }
-
+        // Chiqish
         function logout() {
             document.getElementById("appCard").classList.add("hidden");
             document.getElementById("loginCard").classList.remove("hidden");
