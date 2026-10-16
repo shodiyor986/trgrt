@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LudoGames - Tizimga kirish</title>
+    <!-- SheetJS kutubxonasi Excel faylni o'qish uchun -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 300px; text-align: center; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        .hidden { display: none; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <!-- Kirish oynasi -->
+    <div class="card" id="loginCard">
+        <h2>LudoGames Kirish</h2>
+        <input type="text" id="loginUsername" placeholder="Loginni kiriting">
+        <input type="password" id="loginPassword" placeholder="Parolni kiriting">
+        <button onclick="checkLogin()">Kirish</button>
+        <p class="error" id="errorMsg"></p>
+    </div>
+
+    <!-- Ilova sahifasi (Muvaffaqiyatli kirilganda ochiladi) -->
+    <div class="card hidden" id="appCard">
+        <h2 class="success">Xush kelibsiz!</h2>
+        <p>Siz muvaffaqiyatli tizimga kirdingiz.</p>
+        <button onclick="logout()" style="background: #dc3545;">Chiqish</button>
+    </div>
+
+    <script>
+        // Dropbox havolasini to'g'ridan-to'g'ri yuklab olish uchun (?dl=1 qilib o'zgartirildi)
+        const dropboxUrl = "https://www.dropbox.com/scl/fi/mcud7j7jp64nhkhnr3l5e/LudoGames.xlsx?rlkey=3ne8tu46oyiv95p54wvb1bcoa&st=kya0tige&dl=1";
+
+        async function checkLogin() {
+            let uInput = document.getElementById("loginUsername").value.trim();
+            let pInput = document.getElementById("loginPassword").value.trim();
+            let errorMsg = document.getElementById("errorMsg");
+
+            if (!uInput || !pInput) {
+                errorMsg.innerText = "Iltimos, barcha maydonlarni to'ldiring!";
+                return;
+            }
+
+            errorMsg.innerText = "Tekshirilmoqda...";
+
+            try {
+                // Dropbox'dan Excel faylini yuklab olish
+                let response = await fetch(dropboxUrl);
+                let data = await response.arrayBuffer();
+                
+                // Excelni o'qash
+                let workbook = XLSX.read(data, {type: 'array'});
+                let firstSheetName = workbook.SheetNames[0];
+                let worksheet = workbook.Sheets[firstSheetName];
+                
+                // JSON formatiga o'tkazish (Faylda 'username' va 'password' ustunlari bo'lishi kerak)
+                let rows = XLSX.utils.sheet_to_json(worksheet);
+
+                // Foydalanuvchini bazadan qidirish
+                let userFound = rows.find(row => row.username == uInput && row.password == pInput);
+
+                if (userFound) {
+                    // Agar topilsa ilova sahifasini ochish
+                    document.getElementById("loginCard").classList.add("hidden");
+                    document.getElementById("appCard").classList.remove("hidden");
+                } else {
+                    errorMsg.innerText = "Login yoki parol xato!";
+                }
+
+            } catch (error) {
+                console.error(error);
+                errorMsg.innerText = "Faylni o'qishda xatolik yuz berdi!";
+            }
+        }
+
+        function logout() {
+            document.getElementById("loginCard").classList.remove("hidden");
+            document.getElementById("appCard").classList.add("hidden");
+            document.getElementById("loginUsername").value = "";
+            document.getElementById("loginPassword").value = "";
+            document.getElementById("errorMsg").innerText = "";
+        }
+    </script>
+</body>
+</html>
