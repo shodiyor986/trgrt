@@ -3,9 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LudoGames - Tizim</title>
-    <!-- SheetJS kutubxonasi Excel faylni o'qish uchun -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <title>LudoGames - Avtorizatsiya</title>
     <style>
         body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 320px; text-align: center; }
@@ -17,73 +15,43 @@
         .hidden { display: none; }
         .success { color: green; font-weight: bold; }
         .error { color: red; font-size: 14px; }
-        .info { color: #555; font-size: 11px; margin-top: 15px; line-height: 1.4; }
     </style>
 </head>
 <body>
 
-    <!-- 1. Kirish oynasi -->
+    <!-- Kirish oynasi -->
     <div class="card" id="loginCard">
-        <h2>LudoGames - Kirish</h2>
-        <input type="text" id="loginUser" placeholder="Loginni kiriting">
-        <input type="password" id="loginPass" placeholder="Parolni kiriting">
+        <h2>Tizimga kirish</h2>
+        <input type="text" id="loginUser" placeholder="Login">
+        <input type="password" id="loginPass" placeholder="Parol">
         <button onclick="loginUser()">Kirish</button>
         <p class="error" id="loginError"></p>
         <button class="switch-btn" onclick="showRegister()">Akkountingiz yo'qmi? Ro'yxatdan o'ting</button>
     </div>
 
-    <!-- 2. Ro'yxatdan o'tish oynasi -->
+    <!-- Ro'yxatdan o'tish oynasi -->
     <div class="card hidden" id="registerCard">
         <h2>Ro'yxatdan o'tish</h2>
-        <input type="text" id="regUser" placeholder="Yangi login yarating">
-        <input type="password" id="regPass" placeholder="Yangi parol yarating">
+        <input type="text" id="regUser" placeholder="Yangi login">
+        <input type="password" id="regPass" placeholder="Yangi parol">
         <button onclick="registerUser()" style="background: #28a745;">Ro'yxatdan o'tish</button>
         <p class="error" id="regError"></p>
         <button class="switch-btn" onclick="showLogin()">Akkountingiz bormi? Kirish</button>
     </div>
 
-    <!-- 3. Asosiy ilova sahifasi -->
+    <!-- Asosiy ilova sahifasi -->
     <div class="card hidden" id="appCard">
         <h2 class="success">Xush kelibsiz, <span id="welcomeUser"></span>!</h2>
-        <p>Siz tizimga muvaffaqiyatli kirdingiz.</p>
-        <button onclick="logout()" style="background: #dc3545; margin-top: 20px;">Chiqish</button>
+        <p>Siz LudoGames ilovasiga muvaffaqiyatli kirdingiz.</p>
+        <button onclick="logout()" style="background: #dc3545; margin-top: 15px;">Chiqish</button>
     </div>
 
     <script>
-        // Dropbox to'g'ridan-to'g'ri yuklab olish havolasi
-        const dropboxUrl = "https://www.dropbox.com/scl/fi/mcud7j7jp64nhkhnr3l5e/LudoGames.xlsx?rlkey=3ne8tu46oyiv95p54wvb1bcoa&st=kya0tige&dl=1";
-
-        let allUsers = [];
-
-        // Sahifa yuklanganda Dropbox'dagi faylni va brauzer xotirasini birlashtirish
-        async function initDatabase() {
-            try {
-                let response = await fetch(dropboxUrl);
-                let data = await response.arrayBuffer();
-                let workbook = XLSX.read(data, {type: 'array'});
-                let sheet = workbook.Sheets[workbook.SheetNames[0]];
-                let dropboxRows = XLSX.utils.sheet_to_json(sheet);
-                
-                // Dropbox'dagi userlarni olamiz
-                allUsers = dropboxRows;
-            } catch (e) {
-                console.log("Dropbox faylini o'qib bo'lmadi, lokal xotiraga o'tilmoqda.");
-                allUsers = [];
-            }
-
-            // Brauzer xotirasida (localStorage) saqlangan ro'yxatdan o'tganlarni qo'shamiz
-            let localUsers = JSON.parse(localStorage.getItem("ludo_registered_users") || "[]");
-            
-            // Ikkalasini birlashtiramiz (takrorlanishni oldini olib)
-            localUsers.forEach(locUser => {
-                if (!allUsers.some(u => u.username === locUser.username)) {
-                    allUsers.push(locUser);
-                }
-            });
-        }
-
-        // Dastur ishga tushishi bilan bazani yuklaymiz
-        initDatabase();
+        // --- SOZLAMALAR ---
+        const GITHUB_USERNAME = "GITHUB_USERNAMINGIZ"; // Masalan: Shodiyor
+        const REPO_NAME = "REPO_Nomingiz";         // Masalan: LudoGames
+        const FILE_PATH = "users.json";               // Repozitoriy ichidagi fayl nomi
+        const GITHUB_TOKEN = "Ggithub_token_kiri_sh_kerak"; // GitHub Settings -> Developer settings -> Personal access tokens (repo huquqi bilan)
 
         function showRegister() {
             document.getElementById("loginCard").classList.add("hidden");
@@ -97,8 +65,25 @@
             document.getElementById("loginError").innerText = "";
         }
 
-        // Ro'yxatdan o'tish funksiyasi
-        function registerUser() {
+        // GitHub'dan foydalanuvchilar faylini o'qish
+        async function fetchUsersFromGitHub() {
+            const url = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${FILE_PATH}`;
+            try {
+                let response = await fetch(url, {
+                    headers: { "Authorization": `token ${GITHUB_TOKEN}` }
+                });
+                if (!response.ok) return { users: [], sha: null };
+                let data = await response.json();
+                let jsonString = decodeURIComponent(escape(atob(data.content)));
+                return { users: JSON.parse(jsonString), sha: data.sha };
+            } catch (e) {
+                console.error("O'qish xatosi:", e);
+                return { users: [], sha: null };
+            }
+        }
+
+        // Ro'yxatdan o'tish (GitHub fayliga yangi user yozish)
+        async function registerUser() {
             let u = document.getElementById("regUser").value.trim();
             let p = document.getElementById("regPass").value.trim();
             let err = document.getElementById("regError");
@@ -108,31 +93,54 @@
                 return;
             }
 
-            // Oldindan bormi tekshiramiz
-            let exists = allUsers.find(user => user.username === u);
-            if (exists) {
+            err.innerText = "Bazaga saqlanmoqda...";
+
+            let gitData = await fetchUsersFromGitHub();
+            let users = gitData.users;
+            let fileSha = gitData.sha;
+
+            // Bunday user borligini tekshirish
+            if (users.some(user => user.username === u)) {
                 err.innerText = "Bu login allaqachon band qilingan!";
                 return;
             }
 
-            // Yangi user yaratish
-            let newUser = { username: u, password: p };
-            allUsers.push(newUser);
+            // Yangi user qo'shish
+            users.push({ username: u, password: p });
 
-            // Brauzerning localStorage xotirasiga saqlaymiz (sahifa yangilanganda o'chib ketmaydi)
-            let localUsers = JSON.parse(localStorage.getItem("ludo_registered_users") || "[]");
-            localUsers.push(newUser);
-            localStorage.setItem("ludo_registered_users", JSON.stringify(localUsers));
+            // GitHub faylini yangilash (Commit qilish)
+            const url = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${FILE_PATH}`;
+            let updatedContent = btoa(unescape(encodeURIComponent(JSON.stringify(users, null, 2))));
 
-            alert("Muvaffaqiyatli ro'yxatdan o'tdingiz! Endi kirishingiz mumkin.");
-            showLogin();
-            
-            document.getElementById("regUser").value = "";
-            document.getElementById("regPass").value = "";
+            try {
+                let response = await fetch(url, {
+                    method: "PUT",
+                    headers: {
+                        "Authorization": `token ${GITHUB_TOKEN}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        message: `Yangi foydalanuvchi qo'shildi: ${u}`,
+                        content: updatedContent,
+                        sha: fileSha
+                    })
+                });
+
+                if (response.ok) {
+                    alert("Muvaffaqiyatli ro'yxatdan o'tdingiz!");
+                    showLogin();
+                    document.getElementById("regUser").value = "";
+                    document.getElementById("regPass").value = "";
+                } else {
+                    err.innerText = "Saqlashda xatolik yuz berdi!";
+                }
+            } catch (e) {
+                err.innerText = "Tarmoq xatosi!";
+            }
         }
 
-        // Kirish funksiyasi
-        function loginUser() {
+        // Tizimga kirish
+        async function loginUser() {
             let u = document.getElementById("loginUser").value.trim();
             let p = document.getElementById("loginPass").value.trim();
             let err = document.getElementById("loginError");
@@ -142,8 +150,12 @@
                 return;
             }
 
-            // Bazadan qidirish
-            let found = allUsers.find(user => user.username === u && String(user.password) === String(p));
+            err.innerText = "Tekshirilmoqda...";
+
+            let gitData = await fetchUsersFromGitHub();
+            let users = gitData.users;
+
+            let found = users.find(user => user.username === u && String(user.password) === String(p));
 
             if (found) {
                 document.getElementById("loginCard").classList.add("hidden");
@@ -154,7 +166,6 @@
             }
         }
 
-        // Chiqish
         function logout() {
             document.getElementById("appCard").classList.add("hidden");
             document.getElementById("loginCard").classList.remove("hidden");
